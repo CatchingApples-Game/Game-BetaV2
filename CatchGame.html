@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catch the Falling Objects</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: green;
+        }
+    </style>
+</head>
+
+<body>
+
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"></script>
+    <script>
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+
+        const config = {
+            type: Phaser.AUTO,
+            width: screenWidth,
+            height: screenHeight,
+            scene: {
+                preload: preload,
+                create: create,
+                update: update
+            },
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 0 },
+                    debug: false
+                }
+            }
+        };
+
+        const game = new Phaser.Game(config);
+
+        let player;
+        let cursors;
+        let objects;
+        let enemies;
+        let ground;
+        let score = 0;
+        let scoreText;
+        let resetButton;
+        let objectTimer;
+        let isGameRunning = false;
+
+        function preload() {
+            this.load.image('basket', 'https://cdn.pixabay.com/photo/2013/07/13/12/13/basket-159430_1280.png');
+            this.load.image('object', 'https://cdn.pixabay.com/photo/2022/12/21/11/01/apple-7669788_1280.png');
+            this.load.image('enemy', 'https://cdn.pixabay.com/photo/2022/09/28/13/34/apple-7485081_1280.png');
+        }
+
+        function create() {
+            cursors = this.input.keyboard.createCursorKeys();
+
+            // "Start Game" button
+            const startButton = this.add.text(screenWidth / 2 - 60, screenHeight / 2, 'Start Game', { fontSize: '20px', fill: '#fff', backgroundColor: '#333' })
+                .setInteractive()
+                .on('pointerdown', function () {
+                    startGame();
+                    startButton.visible = false;
+                });
+
+            player = this.physics.add.sprite(screenWidth / 2, screenHeight - 60, 'basket').setScale(0.055); // Adjusted size
+            player.setCollideWorldBounds(true);
+
+            objects = this.physics.add.group();
+            enemies = this.physics.add.group();
+            ground = this.physics.add.staticGroup();
+            ground.create(screenWidth / 2, screenHeight, 'object').setScale(screenWidth, 1).refreshBody();
+
+            this.physics.add.collider(objects, ground, respawnObjects, null, this);
+            this.physics.add.collider(enemies, ground, respawnEnemies, null, this);
+            this.physics.add.collider(objects, objects);
+            this.physics.add.collider(enemies, enemies);
+            this.physics.add.collider(player, objects, catchObject, null, this);
+            this.physics.add.collider(player, enemies, catchEnemy, null, this);
+
+            scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#fff' });
+
+            resetButton = this.add.text(screenWidth - 120, 16, 'Reset', { fontSize: '20px', fill: '#fff', backgroundColor: '#333' })
+                .setInteractive()
+                .on('pointerdown', function () {
+                    resetGame();
+                });
+
+            resetButton.visible = false;
+
+            // Timer to continuously drop objects and enemies
+            objectTimer = this.time.addEvent({
+                delay: 3000, // 3 seconds interval
+                callback: dropObjectsAndEnemies,
+                callbackScope: this,
+                loop: true
+            });
+
+            // Spacebar to pause/resume the game
+            this.input.keyboard.on('keydown-SPACE', function (event) {
+                if (isGameRunning) {
+                    this.physics.pause();
+                    isGameRunning = false;
+                } else {
+                    this.physics.resume();
+                    isGameRunning = true;
+                }
+            }, this);
+        }
+
+        function update() {
+            if (!isGameRunning) {
+                return;
+            }
+
+            if (cursors.left.isDown) {
+                player.setVelocityX(-160);
+            } else if (cursors.right.isDown) {
+                player.setVelocityX(160);
+            } else {
+                player.setVelocityX(0);
+            }
+
+            scoreText.setText('Score: ' + score);
+        }
+
+        function startGame() {
+            isGameRunning = true;
+        }
+
+        function dropObjectsAndEnemies() {
+            const numObjects = Phaser.Math.Between(0, 10);
+            const numEnemies = Phaser.Math.Between(0, 5);
+
+            for (let i = 0; i < numObjects; i++) {
+                const object = objects.create(Phaser.Math.Between(0, screenWidth), 0, 'object').setScale(0.065); // Adjusted size
+                object.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
+                object.setVelocityY(Phaser.Math.Between(100, 300));
+            }
+
+            for (let i = 0; i < numEnemies; i++) {
+                const enemy = enemies.create(Phaser.Math.Between(0, screenWidth), 0, 'enemy').setScale(0.045); // Adjusted size
+                enemy.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
+                enemy.setVelocityY(Phaser.Math.Between(100, 300));
+            }
+        }
+
+        function respawnObjects(ground, object) {
+            object.disableBody(true, true);
+        }
+
+        function respawnEnemies(ground, enemy) {
+            enemy.disableBody(true, true);
+        }
+
+        function catchObject(player, object) {
+            object.disableBody(true, true);
+            score += 10;
+
+            if (objects.countActive(true) === 0 && enemies.countActive(true) === 0) {
+                resetButton.visible = true;
+            }
+        }
+
+        function catchEnemy(player, enemy) {
+            enemy.disableBody(true, true);
+            score -= 10;
+
+            if (objects.countActive(true) === 0 && enemies.countActive(true) === 0) {
+                resetButton.visible = true;
+            }
+        }
+
+        function resetGame() {
+            objects.clear(true, true);
+            enemies.clear(true, true);
+            score = 0;
+            resetButton.visible = false;
+        }
+    </script>
+
+</body>
+
+</html>
